@@ -7,6 +7,9 @@ import com.google.testing.compile.Compiler;
 import com.google.testing.compile.JavaFileObjects;
 import io.github.cdimascio.dotenv.Dotenv;
 import io.sui.Sui;
+import io.sui.bcsgen.TypeTag;
+import io.sui.models.transactions.TransactionBlockResponse;
+import io.sui.models.transactions.TransactionBlockResponseOptions;
 import org.example.annotation.BlockchainEntity;
 import org.example.processor.BlockchainEntityProcessor;
 import org.jetbrains.annotations.Nullable;
@@ -21,6 +24,8 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -117,33 +122,6 @@ public class SuiContractManagerTest {
         assertTrue(Arrays.stream(sourceFiles).anyMatch(f -> f.getName().equals("foo.move")),
                 "foo.move not found in sources directory");
 
-        // Overwrite foo.move with corrected version
-        Path fooMovePath = sourcesDir.resolve("foo.move");
-        String fooMoveContent = """
-            #[allow(unused_variable, duplicate_alias, unused_use)]
-            module foo::foo {
-                use 0x2::object::{Self, UID};
-                use 0x2::tx_context::{Self, TxContext};
-                use 0x2::transfer;
-                use 0x1::string::String;
-
-                public struct Bar has key, store {
-                    id: UID,
-                    name: String,
-                    count: u64,
-                }
-
-                public fun create(name: String, count: u64, _ctx: &mut TxContext): Bar {
-                    Bar {
-                        id: object::new(_ctx),
-                        name,
-                        count,
-                    }
-                }
-            }
-            """;
-        Files.writeString(fooMovePath, fooMoveContent);
-        System.out.println("Overwrote foo.move with corrected version");
 
         // Step 5: Create Move.toml
         Path moveTomlPath = tempMoveDir.resolve("Move.toml");
@@ -157,7 +135,6 @@ public class SuiContractManagerTest {
             foo = "0x0"
 
             [dependencies]
-            Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
             """;
         Files.writeString(moveTomlPath, moveTomlContent);
         System.out.println("Wrote Move.toml to: " + moveTomlPath.toAbsolutePath());
@@ -169,13 +146,98 @@ public class SuiContractManagerTest {
         assertNotNull(bytecodeFiles, "Bytecode directory is empty");
         assertTrue(bytecodeFiles.length > 0, "No bytecode files generated");
 
-        // Step 9: Publish the contract using sui client publish
+        // Step 7: Publish the contract using sui client publish
         String packageId = mgr.publish(tempMoveDir);
         assertNotNull(packageId, "Deployment failed: Package ID is null");
         assertTrue(packageId.startsWith("0x"), "Invalid package ID: " + packageId);
         System.out.println("Deployed contract with package ID: " + packageId);
 
 
+    }
+
+    @Test
+    public void testMoveContractGeneration_DeploymentAnd_Calling_Transactions() throws Exception {
+        // Step 1: Create temporary Move project directory
+        Path tempMoveDir = Files.createTempDirectory("test-move-" + UUID.randomUUID());
+        Path sourcesDir = tempMoveDir.resolve("sources");
+        Files.createDirectories(sourcesDir);
+        System.out.println("Created Move project directory: " + tempMoveDir.toAbsolutePath());
+
+        // Step 2: Set system properties for processor
+        System.setProperty("test.move.dir", tempMoveDir.toString());
+        System.setProperty("test.java.dir", tempMoveDir.toString());
+
+        // Step 3: Compile test Java source
+        JavaFileObject input = JavaFileObjects.forSourceLines(
+                "test.Bar",
+                "package test;",
+                "import org.example.annotation.BlockchainEntity;",
+                "@BlockchainEntity(module = \"foo\", struct = \"Bar\")",
+                "public class Bar {",
+                "    private String name;",
+                "    private long count;",
+                "}"
+        );
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new BlockchainEntityProcessor())
+                .compile(input);
+        assertThat(compilation).succeededWithoutWarnings();
+
+        // Step 4: Verify and overwrite foo.move
+        File[] sourceFiles = sourcesDir.toFile().listFiles();
+        System.out.println("Files in sourcesDir after processing: " +
+                (sourceFiles != null ? Arrays.toString(sourceFiles) : "null"));
+        assertNotNull(sourceFiles, "Sources directory is empty");
+        assertTrue(Arrays.stream(sourceFiles).anyMatch(f -> f.getName().equals("foo.move")),
+                "foo.move not found in sources directory");
+
+
+        // Step 5: Create Move.toml
+        Path moveTomlPath = tempMoveDir.resolve("Move.toml");
+        String moveTomlContent = """
+            [package]
+            name = "test_package"
+            version = "0.0.1"
+            edition = "2024"
+
+            [addresses]
+            foo = "0x0"
+
+            [dependencies]
+            """;
+        Files.writeString(moveTomlPath, moveTomlContent);
+        System.out.println("Wrote Move.toml to: " + moveTomlPath.toAbsolutePath());
+
+        // Step 6: Compile Move files to bytecode
+        File[] bytecodeFiles = buildMoveCode(tempMoveDir);
+        System.out.println("Files in bytecodeDir: " +
+                (bytecodeFiles != null ? Arrays.toString(bytecodeFiles) : "null"));
+        assertNotNull(bytecodeFiles, "Bytecode directory is empty");
+        assertTrue(bytecodeFiles.length > 0, "No bytecode files generated");
+
+        // Step 7: Publish the contract using sui client publish
+        String packageId = mgr.publish(tempMoveDir);
+        assertNotNull(packageId, "Deployment failed: Package ID is null");
+        assertTrue(packageId.startsWith("0x"), "Invalid package ID: " + packageId);
+        System.out.println("Deployed contract with package ID: " + packageId);
+
+
+        // Create Registry and get registryId
+        String registryId = mgr.createRegistry("Bar", tempMoveDir, packageId);
+        System.out.println("Registry ID: " + registryId);
+
+        // Call create function
+        String createDigest = mgr.moveCall(
+                "Bar",
+                "create",
+                Arrays.asList( "Alice", 25, registryId),
+                tempMoveDir,
+                packageId,
+                true,
+                senderAddress
+        );
+        System.out.println("Create Bar Digest: " + createDigest);
     }
 
 

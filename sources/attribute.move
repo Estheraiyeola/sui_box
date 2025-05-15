@@ -1,115 +1,67 @@
-module sui_box::attribute {
-    use std::string::String;
+#[allow(unused_use, duplicate_alias, lint(custom_state_change))]
+module sui_box::User {
+    use sui::object::{Self, UID, ID};
+    use sui::tx_context::{Self, TxContext};
+    use sui::transfer;
+    use std::string::{Self, String};
+    use std::vector;
+    use std::option::{Self, Option};
 
-    // Define possible types for attribute values
-    public enum Type has store, drop, copy {
-        STRING(String),
-        INT(u64),
-        BOOL(bool),
+    // Registry to track all created objects by their IDs
+    public struct Registry has key {
+        id: UID,
+        items: vector<ID>,
     }
 
-    // Define possible type names for attributes
-    public enum TypeName has store, drop, copy {
-        STRING,
-        INT,
-        BOOL,
+    // Function to create and share the registry
+    public entry fun create_registry(ctx: &mut TxContext) {
+        let registry = Registry {
+            id: object::new(ctx),
+            items: vector::empty(),
+        };
+        transfer::share_object(registry);
     }
 
-    // Structure representing an attribute with a name, value, and type
-    public struct Attribute has store, drop, copy {
+    // Struct with the additional is_deleted field
+    public struct User has key, store {
+        id: UID,
+        is_deleted: bool,
         name: String,
-        value: Type,
-        types: TypeName,
+        age: u64
     }
 
-    // Create a new attribute
-    public fun new_attribute(name: String, value: Type, types: TypeName): Attribute {
-        Attribute { name, value, types }
+    // Create a new instance and register its ID
+    public fun create(name: String, age: u64, registry: &mut Registry, ctx: &mut TxContext): User {
+        let obj = User {
+            id: object::new(ctx),
+            is_deleted: false,
+            name,
+            age
+        };
+        let id = object::uid_to_inner(&obj.id);
+        vector::push_back(&mut registry.items, id);
+        obj
     }
 
-    // Set the value of an attribute
-    public fun set_value(attribute: &mut Attribute, value: Type) {
-        attribute.value = value;
+    // Update the object’s fields by ID (caller must provide the object)
+    public entry fun update_by_id(obj: &mut User, new_name: String, new_age: u64) {
+        assert!(!obj.is_deleted, 0); // Cannot update a deleted object
+        obj.name = new_name;
+        obj.age = new_age;
     }
 
-    // Get the value of an attribute
-    public fun get_value(attribute: &Attribute): &Type {
-        &attribute.value
+    // Check if an ID exists in the registry
+    public fun find_by_id(registry: &Registry, id: ID): bool {
+        vector::contains(&registry.items, &id)
     }
 
-    // Set the name of an attribute
-    public fun set_name(attribute: &mut Attribute, name: String) {
-        attribute.name = name;
+    // Get all registered IDs
+    public fun get_all(registry: &Registry): vector<ID> {
+        registry.items
     }
 
-    // Get the name of an attribute
-    public fun get_name(attribute: &Attribute): String {
-        attribute.name
-    }
-
-    // Helper function: returns the type name for STRING
-    public fun string_type_name(): TypeName {
-        TypeName::STRING
-    }
-
-    // Helper function: returns the type name for INT
-    public fun int_type_name(): TypeName {
-        TypeName::INT
-    }
-
-    // Helper function: returns the type name for BOOL
-    public fun bool_type_name(): TypeName {
-        TypeName::BOOL
-    }
-
-    // Helper function: creates a STRING type value
-    public fun string_type(value: String): Type {
-        Type::STRING(value)
-    }
-
-    // Helper function: creates an INT type value
-    public fun int_type(value: u64): Type {
-        Type::INT(value)
-    }
-
-    // Helper function: creates a BOOL type value
-    public fun bool_type(value: bool): Type {
-        Type::BOOL(value)
-    }
-
-    // Equality function for Type values.
-    // We dereference t1 and t2 to obtain the actual values.
-    public fun type_equal(t1: &Type, t2: &Type): bool {
-        let v1 = *t1;
-        match (v1) {
-            Type::STRING(s1) => {
-                match (*t2) {
-                    Type::STRING(s2) => s1 == s2,
-                    _ => false,
-                }
-            },
-            Type::INT(i1) => {
-                match (*t2) {
-                    Type::INT(i2) => i1 == i2,
-                    _ => false,
-                }
-            },
-            Type::BOOL(b1) => {
-                match (*t2){
-                    Type::BOOL(b2) => b1 == b2,
-                    _ => false,
-                }
-            },
-        }
-    }
-
-
-    #[test]
-    fun test_set_attribute() {
-        let name = b"email".to_string();
-        let value = string_type(b"example@example.com".to_string());
-        let attribute = new_attribute(name, value, string_type_name());
-        let expected = string_type(b"example@example.com".to_string());
-        assert!(type_equal(get_value(&attribute), &expected), 0);
+    // Mark the object as deleted
+    public entry fun delete(obj: &mut User) {
+        obj.is_deleted = true;
     }
 }
