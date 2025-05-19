@@ -1,0 +1,10 @@
+[package]
+name    = "my_test_pkg"
+version = "0.0.1"
+edition = "2024"
+
+[addresses]
+# map your Move modules to on‐chain addresses
+User = "0x0"
+
+[dependencies]

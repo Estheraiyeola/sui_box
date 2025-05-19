@@ -3,7 +3,6 @@ package org.example.blockchain;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.cdimascio.dotenv.Dotenv;
 import io.sui.Sui;
 import io.sui.models.SuiApiException;
 import io.sui.models.objects.ObjectChange;
@@ -47,75 +46,7 @@ public class SuiContractManager {
     public String getPackageId() {
         return pkg;
     }
-
-    public CompletableFuture<String> deployContract(Path packagePath) throws Exception {
-        System.out.println("Deploying contract with gasObjectId: " + gasObjectId + ", gasBudget: " + gasBudget + ", gasPrice: " + gasPrice);
-        File dir = new File(packagePath.toString());
-        File[] moduleFiles = dir.listFiles((d, name) -> name.endsWith(".mv"));
-        if (moduleFiles == null || moduleFiles.length == 0) {
-            throw new IllegalArgumentException("No .mv files in " + dir);
-        }
-        List<String> modulesBase64 = new ArrayList<>();
-        for (File f : moduleFiles) {
-            byte[] b = Files.readAllBytes(f.toPath());
-            modulesBase64.add(Base64.getEncoder().encodeToString(b));
-        }
-        System.out.println("Modules to publish: " + moduleFiles.length);
-
-        TransactionBlockResponseOptions options = new TransactionBlockResponseOptions();
-        options.setShowEffects(true);
-        options.setShowEvents(true);
-        options.setShowInput(true);
-        options.setShowObjectChanges(true);
-
-        List<String> dependencies = List.of(
-                "0x0000000000000000000000000000000000000000000000000000000000000001",
-                "0x0000000000000000000000000000000000000000000000000000000000000002");
-
-        CompletableFuture<TransactionBlockResponse> future = suiClient.publish(
-                senderAddress,
-                modulesBase64,
-                dependencies,
-                gasObjectId,
-                gasBudget,
-                gasPrice,
-                null,
-                options,
-                ExecuteTransactionRequestType.WaitForLocalExecution
-        );
-
-        System.out.println("Transaction future: " + future.toString());
-        System.out.println("Waiting for publish response...");
-        System.out.println("Options: " + options);
-
-        return future.thenApply(resp -> {
-            String packageId = resp.getObjectChanges().stream()
-                    .filter(c -> c instanceof ObjectChange.ObjectChangePublished)
-                    .map(c -> ((ObjectChange.ObjectChangePublished) c).getPackageId())
-                    .findFirst()
-                    .orElseThrow(() -> new RuntimeException("No PackageID found in publish response"));
-            System.out.println("Published package ID: " + packageId);
-            this.pkg = packageId; // Store package ID
-            return packageId;
-        }).exceptionally(throwable -> {
-            Throwable cause = throwable.getCause() != null ? throwable.getCause() : throwable;
-            String errorMessage = "Failed to deploy contract with gasObjectId: " + gasObjectId +
-                    ", senderAddress: " + senderAddress;
-            if (cause instanceof SuiApiException) {
-                SuiApiException apiEx = (SuiApiException) cause;
-                errorMessage += ", SuiApiException: " + apiEx.getMessage() +
-                        ", Code: " + apiEx.getMessage() +
-                        ", Error: " + apiEx.getError();
-                System.err.println(errorMessage);
-                apiEx.printStackTrace(System.err);
-            } else {
-                errorMessage += ", Unexpected error: " + cause.getMessage();
-                System.err.println(errorMessage);
-                cause.printStackTrace(System.err);
-            }
-            throw new CompletionException(errorMessage, cause);
-        });
-    }
+    public String getSenderAddress() {return senderAddress;}
 
 
     public String createRegistry(String module, Path workingDir, String packageId)
@@ -166,7 +97,7 @@ public class SuiContractManager {
                     s = "@" + str;
                 } else {
                     // Strings are JSON-quoted for PTB
-                    s = "\"" + str + "\"";
+                    s = "'" + str + "'";
                 }
             } else {
                 throw new IllegalArgumentException("Unsupported argument type at index " + i + ": " + arg.getClass().getName());

@@ -1,4 +1,3 @@
-// src/main/java/org/example/annotation/BlockchainEntity.java
 package org.example.annotation;
 
 import java.lang.annotation.*;

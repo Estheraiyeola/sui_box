@@ -1,34 +1,21 @@
 package org.example.blockchain;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.Compiler;
 import com.google.testing.compile.JavaFileObjects;
 import io.github.cdimascio.dotenv.Dotenv;
 import io.sui.Sui;
-import io.sui.bcsgen.TypeTag;
-import io.sui.models.transactions.TransactionBlockResponse;
-import io.sui.models.transactions.TransactionBlockResponseOptions;
-import org.example.annotation.BlockchainEntity;
 import org.example.processor.BlockchainEntityProcessor;
-import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import javax.tools.JavaFileObject;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static org.example.blockchain.SuiContractManager.buildMoveCode;

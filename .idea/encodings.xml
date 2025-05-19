@@ -3,7 +3,11 @@
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$/java_box/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/java_box/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/processor/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/processor/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sui_hibernate/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sui_hibernate/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/testProject/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/testProject/src/main/resources" charset="UTF-8" />
   </component>
 </project>
