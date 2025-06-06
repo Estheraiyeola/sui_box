@@ -1,5 +1,5 @@
 ````
-# testSui
+### testSui
 
 A Java project demonstrating **Sui Box** usage: scaffolding, publishing, and interacting with Sui Move contracts directly from Java. This README walks you through:
 
